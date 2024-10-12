@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio de Dessin Virtuel de Chaoussi Cherif</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-color: #f0f4f8;
+            --text-color: #333;
+            --panel-bg: white;
+            --button-bg: #4a90e2;
+            --button-text: white;
+            --shadow-color: rgba(0,0,0,0.1);
+        }
+
+        body.dark-theme {
+            --bg-color: #2c3e50;
+            --text-color: #ecf0f1;
+            --panel-bg: #34495e;
+            --button-bg: #2980b9;
+            --button-text: #ecf0f1;
+            --shadow-color: rgba(0,0,0,0.3);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Roboto', sans-serif;
+            transition: all 0.3s ease;
+        }
+        #appContainer {
+            display: flex;
+            gap: 20px;
+        }
+        #canvasContainer {
+            position: relative;
+            box-shadow: 0 10px 20px var(--shadow-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #canvas {
+            background-color: white;
+            border-radius: 10px;
+        }
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transform: scaleX(-1);
+        }
+        #controlPanel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px var(--shadow-color);
+            width: 200px;
+        }
+        .controlGroup {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .controlGroup h3 {
+            margin: 0;
+            font-size: 16px;
+            color: var(--text-color);
+        }
+        .colorBtn {
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        .colorBtn:hover {
+            transform: scale(1.1);
+        }
+        .actionBtn {
+            padding: 10px;
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .actionBtn:hover {
+            filter: brightness(1.1);
+        }
+        .actionBtn.active {
+            background-color: #45a049;
+        }
+        #brushSize {
+            width: 100%;
+        }
+        #brushSizeValue {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-color);
+        }
+        #colorPalette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        #themeToggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 24px;
+            cursor: pointer;
+        }
+        #logo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: var(--panel-bg);
+            padding: 5px;
+            border-radius: 50px;
+            box-shadow: 0 2px 5px var(--shadow-color);
+        }
+        #logoImage {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        #cursorIcon {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1000;
+            font-size: 24px;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s ease; /* Ajout d'une transition douce */
+        }
+        #restIcon {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1000;
+            font-size: 24px;
+            display: none;
+        }
+        
+    </style>
+</head>
+<body>
+    <div id="logo">
+        <img id="logoImage" src="logo.jpg" alt="Logo Chaoussi Cherif">
+        <span>Chaoussi Cherif</span>
+    </div>
+    <button id="themeToggle"><i class="fas fa-moon"></i></button>
+    <div id="cursorIcon" style="display: none;"></div>
+    <div id="restIcon" style="display: none;"><i class="fas fa-hand-paper"></i></div>
+    <div id="appContainer">
+        <div id="canvasContainer">
+            <canvas id="canvas"></canvas>
+            <video id="video" width="640" height="480" autoplay></video>
+        </div>
+        <div id="controlPanel">
+            <div class="controlGroup">
+                <h3>Mode</h3>
+                <button id="drawMode" class="actionBtn active"><i class="fas fa-pen"></i> Dessin</button>
+                <button id="eraseMode" class="actionBtn"><i class="fas fa-eraser"></i> Gomme</button>
+                <button id="restMode" class="actionBtn"><i class="fas fa-hand-paper"></i> Repos</button>
+            </div>
+            <div class="controlGroup">
+                <h3>Couleurs</h3>
+                <div id="colorPalette">
+                    <button class="colorBtn" style="background-color: #000000;"></button>
+                    <button class="colorBtn" style="background-color: #ffffff;"></button>
+                    <button class="colorBtn" style="background-color: #e74c3c;"></button>
+                    <button class="colorBtn" style="background-color: #2ecc71;"></button>
+                    <button class="colorBtn" style="background-color: #3498db;"></button>
+                    <button class="colorBtn" style="background-color: #f1c40f;"></button>
+                    <button class="colorBtn" style="background-color: #9b59b6;"></button>
+                    <button class="colorBtn" style="background-color: #1abc9c;"></button>
+                    <button class="colorBtn" style="background-color: #e67e22;"></button>
+                    <button class="colorBtn" style="background-color: #34495e;"></button>
+                </div>
+            </div>
+            <div class="controlGroup">
+                <h3>Taille du pinceau</h3>
+                <input type="range" id="brushSize" min="1" max="20" value="3">
+                <div id="brushSizeValue">3</div>
+            </div>
+            <button id="clearButton" class="actionBtn">Effacer tout</button>
+            <button id="saveButton" class="actionBtn">Sauvegarder</button>
+            <button id="exportButton" class="actionBtn">Exporter</button>
+            <button id="cameraToggle" class="actionBtn">Fermer la caméra</button>
+        </div>
+    </div>
+    <script>
+    (() => {
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const clearButton = document.getElementById('clearButton');
+        const colorButtons = document.querySelectorAll('.colorBtn');
+        const drawMode = document.getElementById('drawMode');
+        const eraseMode = document.getElementById('eraseMode');
+        const restMode = document.getElementById('restMode');
+        const brushSize = document.getElementById('brushSize');
+        const brushSizeValue = document.getElementById('brushSizeValue');
+        const themeToggle = document.getElementById('themeToggle');
+        const cameraToggle = document.getElementById('cameraToggle');
+        const saveButton = document.getElementById('saveButton');
+        const exportButton = document.getElementById('exportButton');
+        const cursorIcon = document.getElementById('cursorIcon');
+
+        let currentMode = 'draw';
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let cameraOn = true;
+
+        canvas.width = 640;
+        canvas.height = 480;
+
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const config = {
+            smoothingFactor: 0.2,
+            minDistance: 3
+        };
+
+        function smoothedPosition(newX, newY) {
+            return {
+                x: lastX * (1 - config.smoothingFactor) + newX * config.smoothingFactor,
+                y: lastY * (1 - config.smoothingFactor) + newY * config.smoothingFactor
+            };
+        }
+
+        function startDrawing(x, y) {
+            isDrawing = true;
+            [lastX, lastY] = [x, y];
+        }
+
+        function draw(newX, newY) {
+            if (!isDrawing || currentMode === 'rest') return;
+    
+            const { x, y } = smoothedPosition(newX, newY);
+            
+            if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) {
+                isDrawing = false;
+                return;
+            }
+    
+            const distance = Math.hypot(x - lastX, y - lastY);
+            if (distance < config.minDistance) return;
+    
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+    
+            if (currentMode === 'erase') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.strokeStyle = 'rgba(255,255,255,1)';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+            }
+    
+            ctx.stroke();
+            ctx.globalCompositeOperation = 'source-over';
+    
+            [lastX, lastY] = [x, y];
+            
+            // Mise à jour de la position de l'icône après chaque dessin
+            updateCursorIcon(x, y);
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        const scaleFactor = 1.2; // Ajustez cette valeur pour affiner la précision
+
+    function updateCursorIcon(x, y) {
+        const canvasRect = canvas.getBoundingClientRect();
+        const scaledX = x * scaleFactor;
+        const scaledY = y * scaleFactor;
+        
+        cursorIcon.style.left = `${scaledX + canvasRect.left}px`;
+        cursorIcon.style.top = `${scaledY + canvasRect.top}px`;
+        cursorIcon.style.display = 'block';
+    
+        if (currentMode === 'draw') {
+            cursorIcon.innerHTML = '<i class="fas fa-pen" style="transform: translate(-50%, -50%) rotate(45deg);"></i>';
+        } else if (currentMode === 'erase') {
+            cursorIcon.innerHTML = '<i class="fas fa-eraser" style="transform: translate(-50%, -50%);"></i>';
+        } else {
+            cursorIcon.style.display = 'none';
+            restIcon.style.left = `${scaledX + canvasRect.left}px`;
+            restIcon.style.top = `${scaledY + canvasRect.top}px`;
+            restIcon.style.display = 'block';
+        }
+    }
+
+        clearButton.addEventListener('click', clearCanvas);
+
+        colorButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                ctx.strokeStyle = button.style.backgroundColor;
+                currentMode = 'draw';
+                updateModeButtons();
+            });
+        });
+
+        drawMode.addEventListener('click', () => {
+            currentMode = 'draw';
+            updateModeButtons();
+        });
+
+        eraseMode.addEventListener('click', () => {
+            currentMode = 'erase';
+            updateModeButtons();
+        });
+
+        restMode.addEventListener('click', () => {
+            currentMode = 'rest';
+            updateModeButtons();
+        });
+
+        function updateModeButtons() {
+            drawMode.classList.toggle('active', currentMode === 'draw');
+            eraseMode.classList.toggle('active', currentMode === 'erase');
+            restMode.classList.toggle('active', currentMode === 'rest');
+            
+            if (currentMode === 'draw') {
+                cursorIcon.innerHTML = '<i class="fas fa-pen"></i>';
+            } else if (currentMode === 'erase') {
+                cursorIcon.innerHTML = '<i class="fas fa-eraser"></i>';
+            } else {
+                cursorIcon.innerHTML = '<i class="fas fa-hand-pointer"></i>';
+            }
+        }
+
+        brushSize.addEventListener('input', (e) => {
+            ctx.lineWidth = e.target.value;
+            brushSizeValue.textContent = e.target.value;
+        });
+
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            themeToggle.innerHTML = document.body.classList.contains('dark-theme') 
+                ? '<i class="fas fa-sun"></i>' 
+                : '<i class="fas fa-moon"></i>';
+        });
+
+        cameraToggle.addEventListener('click', () => {
+            cameraOn = !cameraOn;
+            if (cameraOn) {
+                camera.start();
+                cameraToggle.textContent = 'Fermer la caméra';
+            } else {
+                camera.stop();
+                cameraToggle.textContent = 'Ouvrir la caméra';
+            }
+        });
+
+        saveButton.addEventListener('click', () => {
+            localStorage.setItem('savedDrawing', canvas.toDataURL());
+            alert('Dessin sauvegardé !');
+        });
+
+        exportButton.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'mon_dessin.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+
+        function onResults(results) {
+            if (results.multiHandLandmarks && cameraOn) {
+                const hands = results.multiHandLandmarks;
+                
+                if (hands.length > 0) {
+                    const hand = hands[0];
+                    const indexTip = hand[8];
+                    const x = (1 - indexTip.x) * canvas.width; // Inversion de l'axe X
+                    const y = indexTip.y * canvas.height;
+        
+                    updateCursorIcon(x, y);
+        
+                    if (currentMode !== 'rest') {
+                        if (!isDrawing) {
+                            startDrawing(x, y);
+                        } else {
+                            draw(x, y);
+                        }
+                        cursorIcon.style.display = 'block';
+                        restIcon.style.display = 'none';
+                    } else {
+                        isDrawing = false;
+                        cursorIcon.style.display = 'none';
+                        restIcon.style.display = 'block';
+                    }
+                } else {
+                    isDrawing = false;
+                    cursorIcon.style.display = 'none';
+                    restIcon.style.display = 'none';
+                }
+            } else {
+                cursorIcon.style.display = 'none';
+                restIcon.style.display = 'none';
+            }
+        }
+    
+    
+            const hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+    
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.7
+            });
+    
+            hands.onResults(onResults);
+    
+            const camera = new Camera(video, {
+                onFrame: async () => await hands.send({image: video}),
+                width: 640,
+                height: 480
+            });
+    
+            camera.start();
+    
+            // Initialiser les boutons de mode
+            updateModeButtons();
+    
+            // Charger le dessin sauvegardé s'il existe
+            const savedDrawing = localStorage.getItem('savedDrawing');
+            if (savedDrawing) {
+                const img = new Image();
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = savedDrawing;
+            }
+        })();
+        </script>
+    </body>
+    </html>
